@@ -32,6 +32,8 @@ from thingsboard_gateway.tb_utility.tb_logger import init_logger
 
 from thingsboard_gateway.connectors.connector import Connector
 
+from thingsboard_gateway.tb_utility.tb_loader import TBModuleLoader
+from thingsboard_gateway.tb_utility.tb_utility import TBUtility
 
 class FTPConnector(Connector, Thread):
     def __init__(self, gateway, config, connector_type):
@@ -73,7 +75,8 @@ class FTPConnector(Connector, Thread):
                 poll_period=obj.get('pollPeriod', 60),
                 max_size=obj.get('maxFileSize', 5),
                 delimiter=obj.get('delimiter', ','),
-                device_type=obj.get('devicePatternType', 'Device')
+                device_type=obj.get('devicePatternType', 'Device'),
+                converter=obj.get('converter', None)
                 )
             for obj in self.__config['paths']
             ]
@@ -133,7 +136,22 @@ class FTPConnector(Connector, Thread):
             time_point = timer()
             if time_point - path.last_polled_time >= path.poll_period or path.last_polled_time == 0:
                 configuration = path.config
-                converter = FTPUplinkConverter(configuration, self.__log)
+                
+                converter = None
+                if path._converter_name is not None:
+                    self.__log.debug('Loading custom converter "%s" for path: %s ', path._converter_name, path._path)
+                
+                    module = TBModuleLoader.import_module(self._connector_type, path._converter_name)
+                    if module is not None:
+                        self.__log.debug('Custom converter for path %s - found!', path._path)
+                        converter = module(configuration, self.__log)
+                    else:
+                        self.__log.error(
+                            "\n\nCannot find extension module for %s url.\nPlease check your configuration.\n",
+                            path._path)
+                else:
+                    converter = FTPUplinkConverter(configuration, self.__log)
+                
                 path.last_polled_time = time_point
 
                 if '*' in path.path:
