@@ -113,6 +113,7 @@ class FTPConnector(Connector, Thread):
             ftp.connect(self.host, self.port)
 
             if isinstance(ftp, FTP_TLS):
+                ftp.auth()
                 ftp.sendcmd('USER ' + self.security['username'])
                 ftp.sendcmd('PASS ' + self.security['password'])
                 ftp.prot_p()
