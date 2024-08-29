@@ -170,7 +170,16 @@ class FTPConnector(Connector, Thread):
                         handled_str = str(handle_stream.getvalue(), 'UTF-8')
                         handled_array = handled_str.split('\n')
 
-                        convert_conf = {'file_ext': file.path_to_file.split('.')[-1]}
+                        convert_conf = {'file_path': file.path_to_file,
+                        		'file_ext': file.path_to_file.split('.')[-1]}
+                        		
+                        if path.txt_file_data_view == 'FULL':
+                            converted_data = converter.convert(convert_conf, handled_str)
+                            if len(converted_data) > 0:
+                                self.__send_data(converted_data)
+                            
+                            handle_stream.close()
+                            return
 
                         if convert_conf['file_ext'] == 'json':
                             json_data = simplejson.loads(handled_str)
@@ -182,8 +191,7 @@ class FTPConnector(Connector, Thread):
                                 converted_data = converter.convert(convert_conf, json_data)
                                 self.__send_data(converted_data)
                         else:
-                            cursor = file.cursor or 0
-
+                            cursor = file.cursor or 0                        
                             for (index, line) in enumerate(handled_array):
                                 if index == 0 and not path.txt_file_data_view == 'SLICED':
                                     convert_conf['headers'] = line.split(path.delimiter)
