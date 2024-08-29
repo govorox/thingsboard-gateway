@@ -50,6 +50,7 @@ class KPASvanUplinkConverter(FTPUplinkConverter):
             telemetry = []
             last = ''
             timestamp = 0
+            values = {}
             
             dict_result = {"deviceName": None, "deviceType": None, "attributes": [], "telemetry": []}
             
@@ -79,7 +80,7 @@ class KPASvanUplinkConverter(FTPUplinkConverter):
                 elif head == 'Start time:':
                     svan.start_time = cols[1].strip() #;06/08/2024 12:13:27
                     dt = datetime.strptime(svan.start_time, '%d/%m/%Y %H:%M:%S')
-                    timestamp = int(datetime.timestamp(dt))
+                    timestamp = int(datetime.timestamp(dt))*1000
                 elif head == 'Measurement time:':
                     svan.duration = cols[1] # ;00:05:00
                 elif head.startswith('Channel '):
@@ -88,9 +89,12 @@ class KPASvanUplinkConverter(FTPUplinkConverter):
                     if channel in [1,2,3] and len(cols) >= 3:
                         key = cols[1].strip().lower() + '_ch'+str(channel)
                         val = float(cols[2])
-                        telemetry.append({"ts": timestamp, "values": {key: val}})
+                        #telemetry.append({"ts": timestamp, "values": {key: val}})
+                        values[key] = val
                 
                 last = head
+                
+            telemetry.append({"ts": timestamp, "values": values})
 
             dict_result["attributes"] = attributes
             dict_result["telemetry"] = telemetry
