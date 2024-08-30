@@ -42,7 +42,7 @@ class KPASvanUplinkConverter(FTPUplinkConverter):
             if len(lines) < 8:
                 return {}
             
-            self._log.debug("data: %s", str(data))
+            #self._log.debug("data: %s", str(data))
             
             svan = SvanTelemetry()
             
@@ -73,7 +73,7 @@ class KPASvanUplinkConverter(FTPUplinkConverter):
                     svan.function = cols[1].strip()
                     attributes.append({"function": svan.function})
                 elif head == 'LAST UPDATED:':
-                    svan.updated = cols[1] #;06/08/2024 12:20:00
+                    svan.updated = cols[1].strip() #;06/08/2024 12:20:00
                     attributes.append({"updated": svan.updated})
                 elif head == 'MAIN RESULTS':
                     pass
@@ -85,13 +85,19 @@ class KPASvanUplinkConverter(FTPUplinkConverter):
                     svan.duration = cols[1] # ;00:05:00
                 elif head.startswith('Channel '):
                     channel = int(head.split(' ')[-1])
-                    self._log.debug("channel: %d", channel)
-                    if channel in [1,2,3] and len(cols) >= 3:
-                        key = cols[1].strip().lower() + '_ch'+str(channel)
-                        val = float(cols[2])
-                        #telemetry.append({"ts": timestamp, "values": {key: val}})
-                        values[key] = val
-                
+                    #self._log.debug("channel: %d", channel)
+                    if len(cols) >= 3:
+                        if channel in [1,2,3]: # Vibration
+                            key = cols[1].strip().lower() + '_ch'+str(channel)
+                            val = float(cols[2])
+                            values[key] = val
+                        elif channel == 4: # Noise
+                            for p in range((len(cols)-1)>>1):
+                                key = cols[p*2+1].strip().replace('(','_').replace(')','')
+                                val = cols[p*2+2].strip()
+                                if len(key) > 0 and len(val) > 0:
+                                    values[key] = float(val)
+                                
                 last = head
                 
             telemetry.append({"ts": timestamp, "values": values})
