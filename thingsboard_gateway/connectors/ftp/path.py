@@ -24,7 +24,7 @@ COMPATIBLE_FILE_EXTENSIONS = ('json', 'txt', 'csv')
 class Path:
     def __init__(self, path: str, delimiter: str, telemetry: list, device_name: str, attributes: list,
                  txt_file_data_view: str, poll_period=60, with_sorting_files=True, device_type='Device', max_size=5,
-                 read_mode='FULL', converter=None):
+                 read_mode='FULL', converter=None, archive=None, max_files=0):
         self._path = path
         self._with_sorting_files = with_sorting_files
         self._poll_period = poll_period
@@ -38,7 +38,9 @@ class Path:
         self._txt_file_data_view = txt_file_data_view
         self.__read_mode = File.ReadMode[read_mode]
         self.__max_size = max_size
-        self._converter_name = converter
+        self._converter_name = converter  # name of a custom converter to use
+        self._archive_path = archive	  # path to archive files to after processing
+        self._max_files = max_files      # max number of files to process in the path
 
     @staticmethod
     def __is_file(ftp, filename):
@@ -58,16 +60,25 @@ class Path:
             ftp.cwd(item)
 
             folder_and_files = ftp.nlst()
-
-            for ff in folder_and_files:
+            #print("files list:", folder_and_files)
+            
+            batch_size = len(folder_and_files)
+            if self._max_files > 0 and self._max_files < batch_size:
+            	batch_size = self._max_files
+            
+            for ff in folder_and_files[:batch_size]:
                 cur_file_name, cur_file_ext = ff.split('.')
-                if cur_file_ext in COMPATIBLE_FILE_EXTENSIONS and self.__is_file(ftp, ff) and ftp.size(ff):
-                    if (file_name == file_ext == '*') \
+                try:
+                    if cur_file_ext.lower() in COMPATIBLE_FILE_EXTENSIONS and self.__is_file(ftp, ff) and ftp.size(ff):
+					    #print("file: %s %s %s" % (item, cur_file_name, cur_file_ext))
+                        if (file_name == file_ext == '*') \
                             or pattern.fullmatch(cur_file_name) \
                             or (cur_file_ext == file_ext and file_name == cur_file_name) \
                             or (file_name != '*' and cur_file_name == file_name and (
                             file_ext == cur_file_ext or file_ext == '*')):
-                        kwargs[ftp.voidcmd(f"MDTM {ff}")] = (item + '/' + ff)
+                            kwargs[ftp.voidcmd(f"MDTM {ff}")] = (item + '/' + ff)
+                except:
+                    print("file error:", cur_file_name)
 
         if self._with_sorting_files:
             return [File(path_to_file=val, read_mode=self.__read_mode, max_size=self.__max_size) for (_, val) in
@@ -83,6 +94,8 @@ class Path:
         filename, fileex = basename.split('.')
 
         for (index, item) in enumerate(dirname.split('/')):
+            if item == '':
+                continue
             if item == '*':
                 current = ftp.pwd()
                 arr = []
