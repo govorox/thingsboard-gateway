@@ -76,7 +76,9 @@ class FTPConnector(Connector, Thread):
                 max_size=obj.get('maxFileSize', 5),
                 delimiter=obj.get('delimiter', ','),
                 device_type=obj.get('devicePatternType', 'Device'),
-                converter=obj.get('converter', None)
+                converter=obj.get('converter', None),
+                archive=obj.get('archive', ''),
+                max_files=obj.get('max_files', 0)
                 )
             for obj in self.__config['paths']
             ]
@@ -155,6 +157,7 @@ class FTPConnector(Connector, Thread):
                 path.last_polled_time = time_point
 
                 if '*' in path.path:
+                    self.__log.debug('Scanning for files in path: %s ', path._path)
                     path.find_files(ftp)
 
                 for file in path.files:
@@ -162,6 +165,8 @@ class FTPConnector(Connector, Thread):
                     if ((file.has_hash() and current_hash != file.hash)
                             or not file.has_hash()) and file.check_size_limit(ftp):
                         file.set_new_hash(current_hash)
+                        
+                        self.__log.debug('Processing file: %s ', file.path_to_file)
 
                         handle_stream = io.BytesIO()
 
@@ -177,11 +182,7 @@ class FTPConnector(Connector, Thread):
                             converted_data = converter.convert(convert_conf, handled_str)
                             if len(converted_data) > 0:
                                 self.__send_data(converted_data)
-                            
-                            handle_stream.close()
-                            return
-
-                        if convert_conf['file_ext'] == 'json':
+                        elif convert_conf['file_ext'] == 'json':
                             json_data = simplejson.loads(handled_str)
                             if isinstance(json_data, list):
                                 for obj in json_data:
@@ -206,6 +207,11 @@ class FTPConnector(Connector, Thread):
                                     self.__send_data(converted_data)
 
                         handle_stream.close()
+                        
+                        if len(path._archive_path) > 0:
+                            dest = path._archive_path + '/' + file.path_to_file.split('/')[-1]
+                            self.__log.info('Archiving file %s to %s', file.path_to_file, dest)
+                            ftp.rename(file.path_to_file, dest)
 
     def __send_data(self, converted_data):
         if converted_data:
