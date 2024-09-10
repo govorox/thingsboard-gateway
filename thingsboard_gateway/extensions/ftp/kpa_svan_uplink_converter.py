@@ -33,6 +33,9 @@ class SvanTelemetry:
 class KPASvanUplinkConverter(FTPUplinkConverter):
     def convert(self, config, data):
         try:
+            if config["file_ext"] != "CSV":
+                return
+            
             delim = ';'
             
             if not data.startswith('UNIT TYPE:'):
@@ -79,7 +82,8 @@ class KPASvanUplinkConverter(FTPUplinkConverter):
                     pass
                 elif head == 'Start time:':
                     svan.start_time = cols[1].strip() #;06/08/2024 12:13:27
-                    dt = datetime.strptime(svan.start_time, '%d/%m/%Y %H:%M:%S')
+                    #dt = datetime.strptime(svan.start_time, '%d/%m/%Y %H:%M:%S')
+                    dt = datetime.strptime(svan.start_time, '%Y-%m-%d %H:%M:%S')
                     timestamp = int(datetime.timestamp(dt))*1000
                 elif head == 'Measurement time:':
                     svan.duration = cols[1] # ;00:05:00
@@ -89,14 +93,20 @@ class KPASvanUplinkConverter(FTPUplinkConverter):
                     if len(cols) >= 3:
                         if channel in [1,2,3]: # Vibration
                             key = cols[1].strip().lower() + '_ch'+str(channel)
-                            val = float(cols[2])
-                            values[key] = val
+                            try:
+                                val = float(cols[2])
+                                values[key] = val
+                            except:
+                                pass
                         elif channel == 4: # Noise
                             for p in range((len(cols)-1)>>1):
                                 key = cols[p*2+1].strip().replace('(','_').replace(')','')
                                 val = cols[p*2+2].strip()
                                 if len(key) > 0 and len(val) > 0:
-                                    values[key] = float(val)
+                                    try:
+                                        values[key] = float(val)
+                                    except:
+                                        pass
                                 
                 last = head
                 
